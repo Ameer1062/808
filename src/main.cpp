@@ -2593,7 +2593,7 @@ string GetWarnings(string strFor)
     if (Checkpoints::IsSyncCheckpointTooOld(60 * 60 * 24 * 15) && !fTestNet)
     {
         nPriority = 100;
-        strStatusBar = "808";
+        strStatusBar = "";
     }
 
     // 808: if detected invalid checkpoint enter safe mode
