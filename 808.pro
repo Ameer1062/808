@@ -367,7 +367,7 @@ windows:!contains(MINGW_THREAD_BUGFIX, 0) {
     QMAKE_LIBS_QT_ENTRY = -lmingwthrd $$QMAKE_LIBS_QT_ENTRY
 }
 
-!wind32:!mac {
+!win32:!mac {
     DEFINES += LINUX
     LIBS += -lrt
 }
