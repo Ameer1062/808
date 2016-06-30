@@ -47,15 +47,14 @@ win32:QMAKE_LFLAGS *= -Wl,--dynamicbase -Wl,--nxcompat
 win32:QMAKE_LFLAGS *= -Wl,--large-address-aware -static
 # i686-w64-mingw32
 win32:QMAKE_LFLAGS *= -static-libgcc -static-libstdc++
+
 # use: qmake "USE_QRCODE=1"
 # libqrencode (http://fukuchi.org/works/qrencode/index.en.html) must be installed for support
 contains(USE_QRCODE, 1) {
     message(Building with QRCode support)
     DEFINES += USE_QRCODE
-
     INCLUDEPATH += $$QRCODE_INCLUDE_PATH
     LIBS += $$join(QRCODE_LIB_PATH,,-L) -lqrencode
-   
 }
 
 # use: qmake "USE_UPNP=1" ( enabled by default; default)
