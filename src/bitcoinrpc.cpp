@@ -2180,49 +2180,51 @@ Value getwork(const Array& params, bool fHelp)
     }
 }
 
-
 Value getblocktemplate(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() > 1)
+    if (fHelp || params.size() != 1)
         throw runtime_error(
             "getblocktemplate [params]\n"
-            "Returns data needed to construct a block to work on:\n"
-            "  \"version\" : block version\n"
-            "  \"previousblockhash\" : hash of current highest block\n"
-            "  \"transactions\" : contents of non-coinbase transactions that should be included in the next block\n"
-            "  \"coinbaseaux\" : data that should be included in coinbase\n"
-            "  \"coinbasevalue\" : maximum allowable input to coinbase transaction, including the generation award and transaction fees\n"
-            "  \"target\" : hash target\n"
-            "  \"mintime\" : minimum timestamp appropriate for next block\n"
-            "  \"curtime\" : current timestamp\n"
-            "  \"mutable\" : list of ways the block template may be changed\n"
-            "  \"noncerange\" : range of valid nonces\n"
-            "  \"sigoplimit\" : limit of sigops in blocks\n"
-            "  \"sizelimit\" : limit of block size\n"
-            "  \"bits\" : compressed target of next block\n"
-            "  \"height\" : height of the next block\n"
+            "If [params] does not contain a \"data\" key, returns data needed to construct a block to work on:\n"
+            " \"version\" : block version\n"
+            " \"previousblockhash\" : hash of current highest block\n"
+            " \"transactions\" : contents of non-coinbase transactions that should be included in the next block\n"
+            " \"coinbaseaux\" : data that should be included in coinbase\n"
+            " \"coinbasevalue\" : maximum allowable input to coinbase transaction, including the generation award and transaction fees\n"
+            " \"target\" : hash target\n"
+            " \"mintime\" : minimum timestamp appropriate for next block\n"
+            " \"curtime\" : current timestamp\n"
+            " \"mutable\" : list of ways the block template may be changed\n"
+            " \"noncerange\" : range of valid nonces\n"
+            " \"sigoplimit\" : limit of sigops in blocks\n"
+            " \"sizelimit\" : limit of block size\n"
+            " \"bits\" : compressed target of next block\n"
+            " \"height\" : height of the next block\n"
+            "If [params] does contain a \"data\" key, tries to solve the block and returns null if it was successful (and \"rejected\" if not)\n"
             "See https://en.bitcoin.it/wiki/BIP_0022 for full specification.");
 
-    std::string strMode = "template";
-    if (params.size() > 0)
+    const Object& oparam = params[0].get_obj();
+    std::string strMode;
     {
-        const Object& oparam = params[0].get_obj();
         const Value& modeval = find_value(oparam, "mode");
         if (modeval.type() == str_type)
             strMode = modeval.get_str();
         else
-            throw JSONRPCError(-8, "Invalid mode");
+        if (find_value(oparam, "data").type() == null_type)
+            strMode = "template";
+        else
+            strMode = "submit";
     }
 
-    if (strMode != "template")
-        throw JSONRPCError(-8, "Invalid mode");
-
+    if (strMode == "template")
     {
         if (vNodes.empty())
-            throw JSONRPCError(-9, "808 is not connected!");
+            throw JSONRPCError(-9, "digitalcoin is not connected!");
 
         if (IsInitialBlockDownload())
-            throw JSONRPCError(-10, "808 is downloading blocks...");
+            throw JSONRPCError(-10, "digitalcoin is downloading blocks...");
+
+        static CReserveKey reservekey(pwalletMain);
 
         // Update block
         static unsigned int nTransactionsUpdatedLast;
@@ -2232,26 +2234,16 @@ Value getblocktemplate(const Array& params, bool fHelp)
         if (pindexPrev != pindexBest ||
             (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 5))
         {
-            // Clear pindexPrev so future calls make a new block, despite any failures from here on
-            pindexPrev = NULL;
-
-            // Store the pindexBest used before CreateNewBlock, to avoid races
             nTransactionsUpdatedLast = nTransactionsUpdated;
-            CBlockIndex* pindexPrevNew = pindexBest;
+            pindexPrev = pindexBest;
             nStart = GetTime();
 
             // Create new block
             if(pblock)
-            {
                 delete pblock;
-                pblock = NULL;
-            }
-            pblock = CreateNewBlock(*pMiningKey, pwalletMain);
+            pblock = CreateNewBlock(reservekey, pwalletMain);
             if (!pblock)
                 throw JSONRPCError(-7, "Out of memory");
-
-            // Need to update only after we know CreateNewBlock succeeded
-            pindexPrev = pindexPrevNew;
         }
 
         // Update nTime
@@ -2332,6 +2324,20 @@ Value getblocktemplate(const Array& params, bool fHelp)
 
         return result;
     }
+    else
+    if (strMode == "submit")
+    {
+        // Parse parameters
+        CDataStream ssBlock(ParseHex(find_value(oparam, "data").get_str()), SER_NETWORK, PROTOCOL_VERSION);
+        CBlock pblock;
+        ssBlock >> pblock;
+
+        bool fAccepted = ProcessBlock(NULL, &pblock);
+
+        return fAccepted ? Value::null : "rejected";
+    }
+
+    throw JSONRPCError(-8, "Invalid mode");
 }
 
 Value submitblock(const Array& params, bool fHelp)
@@ -2363,7 +2369,6 @@ Value submitblock(const Array& params, bool fHelp)
 
     return Value::null;
 }
-
 
 Value getblockhash(const Array& params, bool fHelp)
 {
@@ -3357,7 +3362,7 @@ static const CRPCCommand vRPCCommands[] =
     { "listaccounts",           &listaccounts,           false },
     { "settxfee",               &settxfee,               false },
     { "getblocktemplate",       &getblocktemplate,       true },
-    { "submitblock",            &submitblock,            false },
+    { "submitblock",            &submitblock,            true },
     { "listsinceblock",         &listsinceblock,         false },
     { "dumpprivkey",            &dumpprivkey,            false },
     { "importprivkey",          &importprivkey,          false },
